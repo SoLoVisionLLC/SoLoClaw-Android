@@ -2,6 +2,7 @@ package com.solovision.openclawagents.data
 
 import android.content.Context
 import android.util.Log
+import com.solovision.openclawagents.BuildConfig
 
 data class OpenClawRuntimeDependencies(
     val repository: OpenClawRepository,
@@ -12,6 +13,15 @@ fun buildOpenClawRuntimeDependencies(context: Context): OpenClawRuntimeDependenc
     val gatewayUrl = resolveGatewayUrl(context)
     val sessionKey = resolveSessionKey(context)
     val apiKey = resolveApiKey(context)
+
+    if (gatewayUrl.isBlank() || sessionKey.isBlank()) {
+        Log.w("OpenClawRuntime", "Gateway URL or session key is blank, falling back to fake repository")
+        return OpenClawRuntimeDependencies(
+            repository = FakeOpenClawRepository(),
+            missionControlService = null
+        )
+    }
+
     return runCatching {
         val transport = GatewayRpcOpenClawTransport(
             context = context,
@@ -37,17 +47,20 @@ fun buildOpenClawRuntimeDependencies(context: Context): OpenClawRuntimeDependenc
 private fun resolveGatewayUrl(context: Context): String {
     val prefs = context.getSharedPreferences("openclaw_gateway", Context.MODE_PRIVATE)
     return prefs.getString("gateway_url", null)
-        ?: "wss://gateway.solobot.cloud"
+        ?.takeIf { it.isNotBlank() }
+        ?: BuildConfig.OPENCLAW_GATEWAY_URL.trim()
 }
 
 private fun resolveSessionKey(context: Context): String {
     val prefs = context.getSharedPreferences("openclaw_gateway", Context.MODE_PRIVATE)
     return prefs.getString("session_key", null)
-        ?: "agent:orion:main"
+        ?.takeIf { it.isNotBlank() }
+        ?: BuildConfig.OPENCLAW_SESSION_KEY.trim()
 }
 
 private fun resolveApiKey(context: Context): String? {
     val prefs = context.getSharedPreferences("openclaw_gateway", Context.MODE_PRIVATE)
     return prefs.getString("api_key", null)
-        ?: "19ca7975c4842989d999110a09569394b203ef14916a4f08187f3e1482197633"
+        ?.takeIf { it.isNotBlank() }
+        ?: BuildConfig.OPENCLAW_API_KEY.trim().takeIf { it.isNotBlank() }
 }
